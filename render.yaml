@@ -2,7 +2,7 @@ services:
   # Public user interface. Requests to /api/* are proxied to fairbench-api
   # inside Render's private network (see frontend/default.conf.template).
   - type: web
-    name: fairbench-web
+    name: fairbench-ai-app
     runtime: docker
     region: ohio
     plan: starter

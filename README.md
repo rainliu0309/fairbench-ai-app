@@ -293,10 +293,10 @@ arq worker_settings.WorkerSettings
 2. 选择 Ohio 区域并确认基础付费实例；Blueprint 会自动创建六项资源；
 3. 在创建向导中分别为 API 与 Worker 填写同一组 `AGNES_API_URL` 与 `AGNES_API_KEY`；不要把它们写入 Git；
 4. 等待 `fairbench-minio`、`fairbench-redis`、`fairbench-postgres` 就绪，再确认
-   `fairbench-api`、`fairbench-worker` 和 `fairbench-web` 均为 **Live**；
-5. 打开 `fairbench-web` 的 `onrender.com` 地址，点击默认管理员登录；访问 API 的 `/health`
+   `fairbench-api`、`fairbench-worker` 和 `fairbench-ai-app` 均为 **Live**；
+5. 打开 `fairbench-ai-app` 的 `onrender.com` 地址，点击默认管理员登录；访问 API 的 `/health`
    确认返回 `status: ok`；
-6. 首次发布后，在 GitHub 仓库的 About 区域和本文开头的 Live Demo 链接中填入 `fairbench-web`
+6. 首次发布后，在 GitHub 仓库的 About 区域和本文开头的 Live Demo 链接中填入 `fairbench-ai-app`
    的公开地址。
 
 Blueprint 为了演示便利默认启用 `LOCAL_SINGLE_USER_MODE=true`。在部署给外部机构、处理真实数据
