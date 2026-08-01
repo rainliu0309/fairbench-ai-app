@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-label="Synthetic demo portrait 035">
+  <rect width="320" height="320" fill="#102238"/>
+  <rect x="18" y="18" width="284" height="284" rx="4" fill="#172d45" stroke="#38546f"/>
+  <circle cx="160" cy="132" r="70" fill="#a46d4d"/>
+  <path d="M90 131c0-58 29-88 70-88s70 30 70 88c-22-47 20-47 0-36-18-65-18z" fill="#303c52"/>
+  <circle cx="134" cy="135" r="5" fill="#17202b"/>
+  <circle cx="186" cy="135" r="5" fill="#17202b"/>
+  <path d="M146 169c10 7 18 7 28 0" fill="none" stroke="#653f37" stroke-width="4" stroke-linecap="round"/>
+  <path d="M74 302c8-72 44-105 86-105s78 33 86 105" fill="#526a8a"/>
+  <rect x="30" y="274" width="76" height="18" fill="#102238"/>
+  <text x="38" y="287" fill="#91aac2" font-family="monospace" font-size="10">FB-035</text>
+</svg>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page {
+      size: A4;
+      margin: 19mm 17mm 20mm;
+      @bottom-center {
+        content: "{{ t.footer }} · " counter(page) " / " counter(pages);
+        color: #637083;
+        font-size: 8pt;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      color: #182435;
+      font: 10pt/1.55 "Noto Sans CJK SC", "Noto Sans", sans-serif;
+      margin: 0;
+    }
+    .top-rule { height: 5px; background: #173c6d; margin-bottom: 18px; }
+    .classification {
+      color: #173c6d; font-weight: 700; font-size: 8.5pt;
+      letter-spacing: .08em; text-transform: uppercase;
+    }
+    h1 { color: #102d52; font-size: 24pt; margin: 8px 0 18px; }
+    h2 {
+      color: #173c6d; font-size: 13pt; margin: 22px 0 9px;
+      border-bottom: 1px solid #cdd6e2; padding-bottom: 5px;
+    }
+    .meta { width: 100%; border-collapse: collapse; }
+    .meta td { padding: 5px 0; border-bottom: 1px solid #e6eaf0; }
+    .meta td:first-child { width: 25%; color: #637083; }
+    .verdict {
+      margin: 18px 0; padding: 15px 17px; border-left: 5px solid #2d6f5f;
+      background: #f2f6f5; font-size: 12pt; font-weight: 700;
+    }
+    .verdict.alert { border-left-color: #a94747; background: #faf3f3; }
+    .metric-grid { display: flex; gap: 8px; margin: 12px 0; }
+    .metric {
+      flex: 1; border: 1px solid #dce2e9; padding: 10px;
+      background: #f8fafc;
+    }
+    .metric .label { color: #637083; font-size: 8pt; }
+    .metric .value { color: #102d52; font-size: 15pt; font-weight: 700; }
+    table.data { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    table.data th {
+      background: #173c6d; color: #fff; text-align: left; padding: 7px;
+      font-size: 8.5pt;
+    }
+    table.data td { padding: 6px 7px; border-bottom: 1px solid #dfe5ec; }
+    table.data tr:nth-child(even) { background: #f6f8fb; }
+    .tag-ok { color: #2d6f5f; font-weight: 700; }
+    .tag-alert { color: #a94747; font-weight: 700; }
+    .note { color: #58677a; background: #f5f7fa; padding: 10px 12px; }
+    .signature { margin-top: 30px; width: 45%; margin-left: auto; }
+    .signature-line { border-bottom: 1px solid #25364b; height: 28px; }
+    .checksum { font-family: monospace; font-size: 7pt; color: #718095; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="top-rule"></div>
+  <div class="classification">{{ t.classification }}</div>
+  <h1>{{ title }}</h1>
+
+  <table class="meta">
+    <tr><td>{{ t.report_no }}</td><td>{{ report_no }}</td></tr>
+    <tr><td>{{ t.issued_at }}</td><td>{{ generated_at }}</td></tr>
+    <tr><td>{{ t.authority }}</td><td>{{ authority }}</td></tr>
+    <tr><td>{{ t.algorithm }}</td><td>{{ algorithm }}</td></tr>
+    <tr><td>{{ t.dataset }}</td><td>{{ dataset }}</td></tr>
+  </table>
+
+  <h2>{{ t.summary }}</h2>
+  <div class="verdict{% if not is_compliant %} alert{% endif %}">
+    {% if is_compliant %}{{ t.passed }}{% else %}{{ t.failed }}{% endif %}
+  </div>
+  <div class="metric-grid">
+    <div class="metric"><div class="label">{{ t.overall_accuracy }}</div><div class="value">{{ "%.1f"|format(metrics.overall_accuracy|default(0) * 100) }}%</div></div>
+    <div class="metric"><div class="label">{{ t.max_gap }}</div><div class="value">{{ "%.1f"|format(metrics.max_group_gap|default(0) * 100) }}%</div></div>
+    <div class="metric"><div class="label">{{ t.bias_coefficient }}</div><div class="value">{{ "%.3f"|format(metrics.bias_coefficient|default(0)) }}</div></div>
+    <div class="metric"><div class="label">{{ t.std_deviation }}</div><div class="value">{{ "%.3f"|format(metrics.std_deviation|default(0)) }}</div></div>
+  </div>
+
+  <h2>{{ t.group_results }}</h2>
+  <table class="data">
+    <thead><tr><th>{{ t.group }}</th><th>{{ t.samples }}</th><th>{{ t.accuracy }}</th><th>{{ t.gap }}</th><th>{{ t.status }}</th></tr></thead>
+    <tbody>
+      {% for row in groups %}
+      <tr>
+        <td>{{ row.dimension }} · {{ row.group }}</td>
+        <td>{{ row.sample_count }}</td>
+        <td>{{ "%.1f"|format(row.accuracy * 100) }}%</td>
+        <td>{{ "%.1f"|format(row.gap_from_overall * 100) }}%</td>
+        <td class="{% if row.gap_from_overall <= threshold %}tag-ok{% else %}tag-alert{% endif %}">
+          {% if row.gap_from_overall <= threshold %}{{ t.compliant }}{% else %}{{ t.warning }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if include_methodology %}
+  <h2>{{ t.methodology }}</h2>
+  <p class="note">{{ t.methodology_body }}</p>
+  {% endif %}
+
+  {% if include_failed_samples %}
+  <h2>{{ t.failed_samples }} · {{ failed_count }}</h2>
+  <p class="note">{{ t.failed_note }}</p>
+  {% if failed_samples %}
+  <table class="data">
+    <thead><tr><th>{{ t.failed_sample_id }}</th><th>{{ t.failure_code }}</th><th>{{ t.failure_reason }}</th><th>{{ t.retries }}</th></tr></thead>
+    <tbody>
+      {% for row in failed_samples %}
+      <tr>
+        <td>{{ row.sample_id }}</td>
+        <td>{{ row.error_code }}</td>
+        <td>{{ row.error_message }}</td>
+        <td>{{ row.retry_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="note">{{ t.no_failed_samples }}</p>
+  {% endif %}
+  {% endif %}
+
+  <div class="signature">
+    <div>{{ t.signer }}：{{ signer }}</div>
+    <div class="signature-line"></div>
+  </div>
+  <p class="checksum">{{ t.checksum }}：{{ source_checksum }}</p>
+</body>
+</html>

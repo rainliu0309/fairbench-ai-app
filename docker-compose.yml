@@ -1,0 +1,151 @@
+name: fairbench-ai-app
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fairbench}
+      POSTGRES_USER: ${POSTGRES_USER:-fairbench}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fairbench_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fairbench} -d ${POSTGRES_DB:-fairbench}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  minio:
+    image: minio/minio:RELEASE.2025-02-07T23-21-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-fairbench}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-fairbench_minio_password}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  simulator:
+    build:
+      context: ./backend
+    command: uvicorn simulator_main:app --host 0.0.0.0 --port 8080
+    # Deliberately internal-only: it is a contract test provider, not a public API.
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://fairbench:fairbench_dev_password@postgres:5432/fairbench}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-fairbench}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-fairbench_minio_password}
+      MINIO_BUCKET: ${MINIO_BUCKET:-fairbench-assets}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      AGNES_API_URL: ${AGNES_API_URL:-http://simulator:8080/v1/agnes/attributes}
+      AGNES_API_KEY: ${AGNES_API_KEY:-}
+      AGNES_AUTH_SCHEME: ${AGNES_AUTH_SCHEME:-none}
+      AGNES_AUTH_HEADER: ${AGNES_AUTH_HEADER:-Authorization}
+      AGNES_PROVIDER_MODE: ${AGNES_PROVIDER_MODE:-multipart_attributes}
+      AGNES_MODEL: ${AGNES_MODEL:-agnes-2.0-flash}
+      AGNES_TIMEOUT_SECONDS: ${AGNES_TIMEOUT_SECONDS:-15}
+      AGNES_MAX_RETRIES: ${AGNES_MAX_RETRIES:-2}
+      AGNES_MAX_CONCURRENCY: ${AGNES_MAX_CONCURRENCY:-4}
+      API_SECRET_TTL_SECONDS: ${API_SECRET_TTL_SECONDS:-86400}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      DEMO_ASSETS_PATH: /demo_data/images
+      SIMULATOR_TARGET_API_URL: ${SIMULATOR_TARGET_API_URL:-http://simulator:8080/v1/face/recognize}
+      JWT_SECRET: ${JWT_SECRET:-fairbench-local-development-secret-change-before-shared-use}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      LOCAL_SINGLE_USER_MODE: ${LOCAL_SINGLE_USER_MODE:-true}
+      LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL:-local-admin@fairbench.local}
+      LOCAL_ADMIN_DISPLAY_NAME: ${LOCAL_ADMIN_DISPLAY_NAME:-Local Regulatory Administrator}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./demo_data/images:/demo_data/images:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      simulator:
+        condition: service_started
+
+  worker:
+    build:
+      context: ./backend
+    command: arq worker_settings.WorkerSettings
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://fairbench:fairbench_dev_password@postgres:5432/fairbench}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-fairbench}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-fairbench_minio_password}
+      MINIO_BUCKET: ${MINIO_BUCKET:-fairbench-assets}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      AGNES_API_URL: ${AGNES_API_URL:-http://simulator:8080/v1/agnes/attributes}
+      AGNES_API_KEY: ${AGNES_API_KEY:-}
+      AGNES_AUTH_SCHEME: ${AGNES_AUTH_SCHEME:-none}
+      AGNES_AUTH_HEADER: ${AGNES_AUTH_HEADER:-Authorization}
+      AGNES_PROVIDER_MODE: ${AGNES_PROVIDER_MODE:-multipart_attributes}
+      AGNES_MODEL: ${AGNES_MODEL:-agnes-2.0-flash}
+      AGNES_TIMEOUT_SECONDS: ${AGNES_TIMEOUT_SECONDS:-15}
+      AGNES_MAX_RETRIES: ${AGNES_MAX_RETRIES:-2}
+      AGNES_MAX_CONCURRENCY: ${AGNES_MAX_CONCURRENCY:-4}
+      API_SECRET_TTL_SECONDS: ${API_SECRET_TTL_SECONDS:-86400}
+      DEMO_ASSETS_PATH: /demo_data/images
+      SIMULATOR_TARGET_API_URL: ${SIMULATOR_TARGET_API_URL:-http://simulator:8080/v1/face/recognize}
+      JWT_SECRET: ${JWT_SECRET:-fairbench-local-development-secret-change-before-shared-use}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      LOCAL_SINGLE_USER_MODE: ${LOCAL_SINGLE_USER_MODE:-true}
+      LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL:-local-admin@fairbench.local}
+      LOCAL_ADMIN_DISPLAY_NAME: ${LOCAL_ADMIN_DISPLAY_NAME:-Local Regulatory Administrator}
+    volumes:
+      - ./demo_data/images:/demo_data/images:ro
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      simulator:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
