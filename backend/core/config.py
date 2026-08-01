@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,6 +51,24 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_async_database_url(cls, value: str) -> str:
+        """Accept managed PostgreSQL URLs while keeping SQLAlchemy async-native.
+
+        Render exposes its internal connection string as ``postgresql://``.
+        SQLAlchemy's async engine requires the ``postgresql+asyncpg://``
+        dialect prefix, so normalize only plain PostgreSQL URLs here. Existing
+        explicitly configured SQLAlchemy URLs remain untouched.
+        """
+
+        raw_url = str(value)
+        if raw_url.startswith("postgres://"):
+            return "postgresql+asyncpg://" + raw_url.removeprefix("postgres://")
+        if raw_url.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + raw_url.removeprefix("postgresql://")
+        return raw_url
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -139,7 +139,10 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    environment:
+      PORT: 80
+      BACKEND_HOSTPORT: backend:8000
     ports:
       - "5173:80"
     depends_on:

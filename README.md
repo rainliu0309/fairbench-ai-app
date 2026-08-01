@@ -283,6 +283,26 @@ arq worker_settings.WorkerSettings
 - 在处理真实生物特征数据前完成数据保护影响评估（DPIA/PIA）、安全测试和法律合规审批；
 - 在将结果作为正式监管结论前，对接入厂商接口、样本来源、标签质量、阈值和评测方法进行独立复核。
 
+### Render 部署
+
+仓库根目录的 [`render.yaml`](render.yaml) 是完整的 Render Blueprint：它会在同一区域创建
+前端、FastAPI、ARq Worker、PostgreSQL、Redis 以及带持久化磁盘的 MinIO。前端通过私有网络
+代理 `/api/v1`，不会将后端内部地址或密钥打包到浏览器。
+
+1. 登录 Render，选择 **New → Blueprint**，连接 `rainliu0309/fairbench-ai-app`，分支选择 `main`；
+2. 选择 Ohio 区域并确认基础付费实例；Blueprint 会自动创建六项资源；
+3. 在创建向导中分别为 API 与 Worker 填写同一组 `AGNES_API_URL` 与 `AGNES_API_KEY`；不要把它们写入 Git；
+4. 等待 `fairbench-minio`、`fairbench-redis`、`fairbench-postgres` 就绪，再确认
+   `fairbench-api`、`fairbench-worker` 和 `fairbench-web` 均为 **Live**；
+5. 打开 `fairbench-web` 的 `onrender.com` 地址，点击默认管理员登录；访问 API 的 `/health`
+   确认返回 `status: ok`；
+6. 首次发布后，在 GitHub 仓库的 About 区域和本文开头的 Live Demo 链接中填入 `fairbench-web`
+   的公开地址。
+
+Blueprint 为了演示便利默认启用 `LOCAL_SINGLE_USER_MODE=true`。在部署给外部机构、处理真实数据
+或公开共享前，必须把 API 与 Worker 的该变量改为 `false`，重建管理员账户，并接入组织身份认证。
+Render 环境默认 `SEED_DEMO_DATA=false`，不会自动上传本仓库的合成样本。
+
 ### 隐私、审计与使用边界
 
 - 仅上传具有合法授权、明确用途和适当数据处理依据的图像；

@@ -1,0 +1,218 @@
+services:
+  # Public user interface. Requests to /api/* are proxied to fairbench-api
+  # inside Render's private network (see frontend/default.conf.template).
+  - type: web
+    name: fairbench-web
+    runtime: docker
+    region: ohio
+    plan: starter
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    autoDeployTrigger: commit
+    healthCheckPath: /
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: /api/v1
+      - key: BACKEND_HOSTPORT
+        fromService:
+          name: fairbench-api
+          type: web
+          property: hostport
+
+  # Public API for OpenAPI, external integrations, and the web reverse proxy.
+  - type: web
+    name: fairbench-api
+    runtime: docker
+    region: ohio
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: commit
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fairbench-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: fairbench-redis
+          type: keyvalue
+          property: connectionString
+      - key: MINIO_ENDPOINT
+        fromService:
+          name: fairbench-minio
+          type: pserv
+          property: hostport
+      - key: MINIO_ACCESS_KEY
+        fromService:
+          name: fairbench-minio
+          type: pserv
+          envVarKey: MINIO_ROOT_USER
+      - key: MINIO_SECRET_KEY
+        fromService:
+          name: fairbench-minio
+          type: pserv
+          envVarKey: MINIO_ROOT_PASSWORD
+      - key: MINIO_BUCKET
+        value: fairbench-assets
+      - key: MINIO_SECURE
+        value: "false"
+      - key: AGNES_API_URL
+        sync: false
+      - key: AGNES_API_KEY
+        sync: false
+      - key: AGNES_AUTH_SCHEME
+        value: bearer
+      - key: AGNES_AUTH_HEADER
+        value: Authorization
+      - key: AGNES_PROVIDER_MODE
+        value: openai_vision
+      - key: AGNES_MODEL
+        value: agnes-2.0-flash
+      - key: AGNES_TIMEOUT_SECONDS
+        value: "20"
+      - key: AGNES_MAX_RETRIES
+        value: "3"
+      - key: AGNES_MAX_CONCURRENCY
+        value: "4"
+      - key: API_SECRET_TTL_SECONDS
+        value: "86400"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRE_MINUTES
+        value: "60"
+      # This is the requested one-click demo administrator. Turn it off before
+      # giving an agency or any untrusted person access to the deployment.
+      - key: LOCAL_SINGLE_USER_MODE
+        value: "true"
+      - key: LOCAL_ADMIN_EMAIL
+        value: local-admin@fairbench.local
+      - key: LOCAL_ADMIN_DISPLAY_NAME
+        value: Fair Bench Administrator
+      - key: SEED_DEMO_DATA
+        value: "false"
+
+  # ARq executes Agnes annotation and target API evaluation without holding
+  # browser requests open.
+  - type: worker
+    name: fairbench-worker
+    runtime: docker
+    region: ohio
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: arq worker_settings.WorkerSettings
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fairbench-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: fairbench-redis
+          type: keyvalue
+          property: connectionString
+      - key: MINIO_ENDPOINT
+        fromService:
+          name: fairbench-minio
+          type: pserv
+          property: hostport
+      - key: MINIO_ACCESS_KEY
+        fromService:
+          name: fairbench-minio
+          type: pserv
+          envVarKey: MINIO_ROOT_USER
+      - key: MINIO_SECRET_KEY
+        fromService:
+          name: fairbench-minio
+          type: pserv
+          envVarKey: MINIO_ROOT_PASSWORD
+      - key: MINIO_BUCKET
+        value: fairbench-assets
+      - key: MINIO_SECURE
+        value: "false"
+      - key: AGNES_API_URL
+        sync: false
+      - key: AGNES_API_KEY
+        sync: false
+      - key: AGNES_AUTH_SCHEME
+        value: bearer
+      - key: AGNES_AUTH_HEADER
+        value: Authorization
+      - key: AGNES_PROVIDER_MODE
+        value: openai_vision
+      - key: AGNES_MODEL
+        value: agnes-2.0-flash
+      - key: AGNES_TIMEOUT_SECONDS
+        value: "20"
+      - key: AGNES_MAX_RETRIES
+        value: "3"
+      - key: AGNES_MAX_CONCURRENCY
+        value: "4"
+      - key: API_SECRET_TTL_SECONDS
+        value: "86400"
+      - key: JWT_SECRET
+        fromService:
+          name: fairbench-api
+          type: web
+          envVarKey: JWT_SECRET
+      - key: JWT_EXPIRE_MINUTES
+        value: "60"
+      - key: LOCAL_SINGLE_USER_MODE
+        value: "true"
+      - key: LOCAL_ADMIN_EMAIL
+        value: local-admin@fairbench.local
+      - key: LOCAL_ADMIN_DISPLAY_NAME
+        value: Fair Bench Administrator
+      - key: SEED_DEMO_DATA
+        value: "false"
+
+  # Internal S3-compatible store for uploaded evaluation samples and PDFs.
+  - type: pserv
+    name: fairbench-minio
+    runtime: image
+    region: ohio
+    plan: starter
+    image:
+      url: docker.io/minio/minio:RELEASE.2025-02-07T23-21-09Z
+    dockerCommand: minio server /data --address $HOST:$PORT
+    autoDeployTrigger: "off"
+    disk:
+      name: fairbench-minio-data
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: MINIO_ROOT_USER
+        generateValue: true
+      - key: MINIO_ROOT_PASSWORD
+        generateValue: true
+      - key: MINIO_BROWSER
+        value: "off"
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "9000"
+
+  # Redis-compatible queue and temporary evaluation-secret cache.
+  - type: keyvalue
+    name: fairbench-redis
+    region: ohio
+    plan: starter
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+    ipAllowList: []
+
+databases:
+  - name: fairbench-postgres
+    databaseName: fairbench
+    user: fairbench
+    region: ohio
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+    ipAllowList: []
