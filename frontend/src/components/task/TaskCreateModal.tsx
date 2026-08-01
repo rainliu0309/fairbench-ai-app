@@ -24,7 +24,9 @@ export function TaskCreateModal({
   const [datasetId, setDatasetId] = useState("");
   const [name, setName] = useState("");
   const [algorithm, setAlgorithm] = useState("");
-  const [endpoint, setEndpoint] = useState("http://simulator:8080/v1/face/recognize");
+  const [endpoint, setEndpoint] = useState(
+    import.meta.env.VITE_SIMULATOR_URL ?? "http://simulator:8080/v1/face/recognize",
+  );
   const [method, setMethod] = useState("POST");
   const [apiKey, setApiKey] = useState("");
   const [authScheme, setAuthScheme] = useState("none");

@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from weasyprint import HTML
 
 from core.report_text import REPORT_TEXT
-from models import AuditReport, Dataset, EvaluationTask, SampleStatus, TaskSampleResult
+from models import AuditReport, EvaluationTask, SampleStatus, TaskSampleResult
 from schemas import ReportCreate
 from services.audit_service import append_audit_log
 from services.storage_service import storage_service

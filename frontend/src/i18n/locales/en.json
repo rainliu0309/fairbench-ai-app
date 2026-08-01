@@ -221,7 +221,7 @@
     "taskPlaceholder": "e.g. Quarterly access-control review",
     "algorithmPlaceholder": "e.g. CityVision Face API v4.3",
     "endpointPlaceholder": "https://vendor.example.com/v1/recognize",
-    "localSimulator": "Local Docker simulation calls a real internal HTTP provider. Replace this address with the vendor endpoint for a live assessment.",
+    "localSimulator": "The default address runs an internal HTTP contract-flow test. Replace it with the vendor endpoint for a live assessment.",
     "authScheme": "Authentication method",
     "authNone": "No authentication",
     "authBearer": "Bearer token",

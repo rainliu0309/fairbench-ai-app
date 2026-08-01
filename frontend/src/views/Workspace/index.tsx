@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { datasetApi, reportApi, statsApi, taskApi } from "../../api/endpoints";
 import type { EvaluationTask } from "../../api/types";
 import { PageHeader } from "../../components/common/PageHeader";
@@ -53,8 +53,11 @@ export function Workspace() {
     queryFn: statsApi.overview,
   });
 
-  const taskItems = tasks.data?.items ?? [];
-  const datasetItems = datasets.data?.items ?? [];
+  const taskItems = useMemo(() => tasks.data?.items ?? [], [tasks.data?.items]);
+  const datasetItems = useMemo(
+    () => datasets.data?.items ?? [],
+    [datasets.data?.items],
+  );
   const runningTasks = taskItems.filter((task) => ["queued", "running"].includes(task.status));
   const alertTasks = taskItems.filter((task) => task.metrics && !task.metrics.is_compliant);
   const labelReviewDatasets = datasetItems.filter((dataset) => dataset.status === "label_review_required");

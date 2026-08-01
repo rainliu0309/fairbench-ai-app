@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router";
 import { authApi } from "../../api/endpoints";
 import { LanguageSwitcher } from "../../components/common/LanguageSwitcher";
 import { sessionStore } from "../../store/session";

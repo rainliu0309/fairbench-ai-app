@@ -1,10 +1,12 @@
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import FileResponse, ORJSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from api import api_router
 from api import auth as auth_api
@@ -102,3 +104,26 @@ async def health() -> dict:
 
 app.include_router(api_router, prefix=settings.api_prefix)
 app.include_router(auth_api.router, prefix=settings.api_prefix)
+
+
+# The free Render profile builds the React application into this directory and
+# serves it from the API process. Development and Compose keep their existing
+# standalone Vite/Nginx frontend because the directory is absent there.
+frontend_dist = Path("/app/frontend_dist").resolve()
+if frontend_dist.is_dir():
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(full_path: str):
+        normalized_api_prefix = settings.api_prefix.strip("/")
+        if full_path == normalized_api_prefix or full_path.startswith(
+            f"{normalized_api_prefix}/"
+        ):
+            raise HTTPException(status_code=404, detail=bilingual("not_found"))
+
+        candidate = (frontend_dist / full_path).resolve()
+        if candidate.is_relative_to(frontend_dist) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(frontend_dist / "index.html")

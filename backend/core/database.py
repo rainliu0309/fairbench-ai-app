@@ -15,7 +15,13 @@ class Base(DeclarativeBase):
     """Declarative base shared by all persistent entities."""
 
 
-engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+engine = create_async_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=settings.database_pool_size,
+    max_overflow=settings.database_max_overflow,
+)
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,

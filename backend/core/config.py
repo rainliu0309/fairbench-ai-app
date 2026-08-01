@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,19 @@ class Settings(BaseSettings):
     minio_secret_key: str = "fairbench_minio_password"
     minio_bucket: str = "fairbench-assets"
     minio_secure: bool = False
+    # Production can use any S3-compatible provider (Supabase Storage on the
+    # free Render profile).  Empty S3 values intentionally fall back to the
+    # MinIO settings above so the existing Compose workflow keeps working.
+    s3_endpoint_url: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"
+    s3_force_path_style: bool = True
+    s3_auto_create_bucket: bool = True
+    database_pool_size: int = 3
+    database_max_overflow: int = 2
+    worker_max_jobs: int = 4
     agnes_api_url: str = "https://api.example.com/v1/face-attributes"
     agnes_api_key: str = ""
     agnes_auth_scheme: str = "bearer"
@@ -65,10 +79,23 @@ class Settings(BaseSettings):
 
         raw_url = str(value)
         if raw_url.startswith("postgres://"):
-            return "postgresql+asyncpg://" + raw_url.removeprefix("postgres://")
-        if raw_url.startswith("postgresql://"):
-            return "postgresql+asyncpg://" + raw_url.removeprefix("postgresql://")
-        return raw_url
+            raw_url = "postgresql+asyncpg://" + raw_url.removeprefix(
+                "postgres://"
+            )
+        elif raw_url.startswith("postgresql://"):
+            raw_url = "postgresql+asyncpg://" + raw_url.removeprefix(
+                "postgresql://"
+            )
+
+        # Managed PostgreSQL dashboards commonly emit libpq's ``sslmode``
+        # parameter. asyncpg expects the equivalent parameter to be named
+        # ``ssl``. Preserve every other query parameter unchanged.
+        parts = urlsplit(raw_url)
+        query = [
+            ("ssl" if key == "sslmode" else key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        ]
+        return urlunsplit(parts._replace(query=urlencode(query)))
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -77,6 +104,25 @@ class Settings(BaseSettings):
     @property
     def has_jwt_secret(self) -> bool:
         return len(self.jwt_secret) >= 32
+
+    @property
+    def storage_endpoint_url(self) -> str:
+        if self.s3_endpoint_url:
+            return self.s3_endpoint_url.rstrip("/")
+        scheme = "https" if self.minio_secure else "http"
+        return f"{scheme}://{self.minio_endpoint}"
+
+    @property
+    def storage_access_key(self) -> str:
+        return self.s3_access_key or self.minio_access_key
+
+    @property
+    def storage_secret_key(self) -> str:
+        return self.s3_secret_key or self.minio_secret_key
+
+    @property
+    def storage_bucket(self) -> str:
+        return self.s3_bucket or self.minio_bucket
 
 
 @lru_cache

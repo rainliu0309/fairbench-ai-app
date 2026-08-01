@@ -221,7 +221,7 @@
     "taskPlaceholder": "例如：城市门禁算法季度复核",
     "algorithmPlaceholder": "例如：CityVision Face API v4.3",
     "endpointPlaceholder": "https://vendor.example.com/v1/recognize",
-    "localSimulator": "本地 Docker 演示会真实调用内部 HTTP 模拟服务；开展正式评测时请替换为厂商接口地址。",
+    "localSimulator": "默认地址用于部署环境内的 HTTP 合约流程测试；开展正式评测时请替换为厂商接口地址。",
     "authScheme": "认证方式",
     "authNone": "无需认证",
     "authBearer": "Bearer 令牌",

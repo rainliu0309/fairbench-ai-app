@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { GlobalErrorDialog } from "./components/common/GlobalErrorDialog";
 import { GovLayout } from "./layouts/GovLayout";

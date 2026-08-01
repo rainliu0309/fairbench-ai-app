@@ -40,12 +40,12 @@ Fair Bench 面向公共 AI 监管机构，提供从测试图集治理、人口�
 
 - 平台不自研、不托管、不替代任何人脸识别模型；识别结果只来自每个评测任务配置的外部 API；
 - Agnes 仅用于授权评测样本的人口属性分组：年龄段、性别、族裔及置信度；它不决定评测结论；
-- 样本图像存入 MinIO，对象引用与业务记录存入 PostgreSQL，批量标注和评测由 Redis + ARq 执行；
+- 样本图像存入 S3 兼容对象存储（本地 MinIO、线上 Supabase Storage），对象引用与业务记录存入 PostgreSQL，批量标注和评测由 Redis + ARq 执行；
 - 每次厂商调用均有超时、并发限制、重试与失败隔离；失败样本可单独查看并重新发起；
 - 目标 API 密钥只在 Redis 临时缓存中保存并设置 TTL；PostgreSQL 仅保存不可逆指纹用于审计关联；
 - 操作日志由 `previous_hash` 与 `entry_hash` 构成链式记录；应用层与 PostgreSQL 触发器拒绝修改或删除；
 - 指标计算位于独立服务中，使用 Pandas 与 NumPy，便于新增公平性标准而不改动厂商适配层；
-- 报告编号、报告摘要与生成记录会进入审计链，报告 PDF 归档至 MinIO。
+- 报告编号、报告摘要与生成记录会进入审计链，报告 PDF 归档至 S3 兼容对象存储。
 
 完整链路如下：
 
@@ -56,7 +56,7 @@ React + TypeScript + Vite ── REST / 进度轮询 ── FastAPI
       │                                              │
       │                             ┌────────────────┼──────────────────┐
       │                             │                │                  │
-      │                        PostgreSQL         Redis              MinIO
+      │                        PostgreSQL         Redis          S3 兼容存储
       │                    业务记录 + 审计链      临时密钥 + ARq      图像 + PDF
       │                                              │
       └────────────────────────── ARq Worker ────────┼───────┐
@@ -100,7 +100,7 @@ JSON/base64 等非 multipart 协议，应在 `backend/services/target_api_servic
 - **前端：** React 19、TypeScript、Vite、React Router、TanStack Query、Recharts、i18next、Axios；
 - **后端：** Python 3.12、FastAPI、SQLAlchemy Async ORM、Pydantic、OpenAPI；
 - **数据与任务：** PostgreSQL 16、Redis 7、ARq、Pandas、NumPy；
-- **文件与报告：** MinIO、Jinja2、WeasyPrint；
+- **文件与报告：** S3 兼容存储（MinIO / Supabase Storage）、Jinja2、WeasyPrint；
 - **外部服务：** Agnes 人口属性标注适配器、可配置的目标人脸识别 API 适配器；
 - **本地演示：** Docker Compose 同时启动 PostgreSQL、Redis、MinIO、FastAPI、ARq Worker、前端和内部 HTTP 合约模拟器。
 
@@ -133,6 +133,9 @@ fairbench-ai-app/
 ├── demo_data/                   # 36 份合成样本、清单与可重复生成脚本
 ├── test/                        # 本地端到端测试用 16 张图片样本
 ├── docker-compose.yml
+├── Dockerfile.render-free       # Render 免费单服务生产镜像
+├── render.yaml                  # 默认免费 Blueprint
+├── render.paid.yaml             # 可选的资源分离付费 Blueprint
 ├── .env.example
 ├── LICENSE
 └── README.md
@@ -178,6 +181,9 @@ docker compose down
 | `DATABASE_URL` | Compose 内 PostgreSQL 地址 | 后端异步数据库连接 |
 | `REDIS_URL` | `redis://redis:6379/0` | ARq 队列与临时 API 密钥缓存 |
 | `MINIO_ENDPOINT` / `MINIO_*` | Compose 内 MinIO | 图像和 PDF 对象存储 |
+| `S3_ENDPOINT_URL` / `S3_*` | 空（回退到 MinIO） | 线上 S3 兼容对象存储；Supabase 端点需保留 `/storage/v1/s3` |
+| `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` | `3` / `2` | 数据库连接池上限控制 |
+| `WORKER_MAX_JOBS` | `4` | 单个 ARq Worker 最大并发任务数；免费部署设为 `1` |
 | `AGNES_API_URL` | 示例地址 | Agnes 或兼容标注服务地址 |
 | `AGNES_API_KEY` | 空 | 仅服务端读取的标注服务密钥 |
 | `AGNES_PROVIDER_MODE` | `multipart_attributes` | `multipart_attributes` 或 `openai_vision` |
@@ -231,7 +237,8 @@ API 基础路径为 `/api/v1`，并在 <http://localhost:8000/docs> 自动生成
 
 如只需验证平台 HTTP、队列、失败隔离和报告流程，可在任务中使用 Compose 内部模拟器默认地址
 `http://simulator:8080/v1/face/recognize`，认证方式选择“无需认证”。该地址只在 Docker
-内部网络可访问，不应作为对外服务地址。
+内部网络可访问；免费 Render 镜像会把表单默认地址替换为同容器的 `127.0.0.1` 模拟器。
+二者都只用于合约流程测试，不应作为真实厂商识别能力或对外服务地址。
 
 ### 质量检查与本地开发
 
@@ -283,25 +290,36 @@ arq worker_settings.WorkerSettings
 - 在处理真实生物特征数据前完成数据保护影响评估（DPIA/PIA）、安全测试和法律合规审批；
 - 在将结果作为正式监管结论前，对接入厂商接口、样本来源、标签质量、阈值和评测方法进行独立复核。
 
-### Render 部署
+### Render 免费部署
 
-仓库根目录的 [`render.yaml`](render.yaml) 是完整的 Render Blueprint：它会在同一区域创建
-前端、FastAPI、ARq Worker、PostgreSQL、Redis 以及带持久化磁盘的 MinIO。前端通过私有网络
-代理 `/api/v1`，不会将后端内部地址或密钥打包到浏览器。
+根目录的 [`render.yaml`](render.yaml) 是默认免费 Blueprint。它只创建一个 Render Free Web
+Service：同一容器提供 React 静态页面、FastAPI、低并发 ARq Worker 与内部合约测试模拟器。
+持久化 PostgreSQL 和 S3 对象存储使用 Supabase Free，队列与临时密钥缓存使用 Upstash Redis
+Free，因此不会请求 Render 付费实例。前端与 API 同源，所有服务端密钥仅作为 Render 环境变量注入。
 
-1. 登录 Render，选择 **New → Blueprint**，连接 `rainliu0309/fairbench-ai-app`，分支选择 `main`；
-2. 选择 Ohio 区域并确认基础付费实例；Blueprint 会自动创建六项资源；
-3. 在创建向导中分别为 API 与 Worker 填写同一组 `AGNES_API_URL` 与 `AGNES_API_KEY`；不要把它们写入 Git；
-4. 等待 `fairbench-minio`、`fairbench-redis`、`fairbench-postgres` 就绪，再确认
-   `fairbench-api`、`fairbench-worker` 和 `fairbench-ai-app` 均为 **Live**；
-5. 打开 `fairbench-ai-app` 的 `onrender.com` 地址，点击默认管理员登录；访问 API 的 `/health`
-   确认返回 `status: ok`；
-6. 首次发布后，在 GitHub 仓库的 About 区域和本文开头的 Live Demo 链接中填入 `fairbench-ai-app`
-   的公开地址。
+部署前先准备以下三组信息，任何密钥都不要提交到 Git：
 
-Blueprint 为了演示便利默认启用 `LOCAL_SINGLE_USER_MODE=true`。在部署给外部机构、处理真实数据
-或公开共享前，必须把 API 与 Worker 的该变量改为 `false`，重建管理员账户，并接入组织身份认证。
-Render 环境默认 `SEED_DEMO_DATA=false`，不会自动上传本仓库的合成样本。
+1. 在 Supabase 创建 Free 项目；在 Storage 新建私有 bucket `fairbench-assets`；
+2. 在 Supabase Storage 的 S3 设置中生成 Access Key，记录 Endpoint、Region、Access Key ID 和
+   Secret Access Key。Endpoint 必须是完整的 `https://<project-ref>.storage.supabase.co/storage/v1/s3`；
+3. 在 Supabase 的 **Connect** 面板复制 **Session pooler** PostgreSQL URL，保留 SSL 参数；若密码
+   含特殊字符，使用面板提供的已编码连接串；
+4. 在 Upstash 创建 Free Redis 数据库，复制以 `rediss://` 开头的 TLS 连接串；
+5. 登录 Render，选择 **New → Blueprint**，连接 `rainliu0309/fairbench-ai-app`，分支选择 `main`；
+6. 在创建表单中填写 `DATABASE_URL`、`REDIS_URL`、`S3_ENDPOINT_URL`、`S3_ACCESS_KEY`、
+   `S3_SECRET_KEY`、`S3_REGION`、`AGNES_API_URL` 与 `AGNES_API_KEY`，然后应用 Blueprint；
+7. 服务变为 **Live** 后打开其 `onrender.com` 地址，访问 `/health` 确认 `status: ok`，再以默认
+   管理员进入并上传测试图集。
+
+`render.yaml` 已启用 Git 自动部署：以后推送到 `main` 会自动重新构建并发布。Render Free 服务
+空闲后会休眠，首次访问需要等待冷启动；进行标注或评测时前端进度轮询会保持服务活跃。Supabase、
+Upstash 与 Render 的免费额度和停用政策可能变化，正式处理大规模或受监管数据前应升级并配置备份、
+WORM/对象锁、监控和组织级身份认证。
+
+为了演示便利，免费 Blueprint 默认启用 `LOCAL_SINGLE_USER_MODE=true` 且不自动写入合成数据。
+部署给外部机构或处理真实数据前，应关闭单用户模式并接入组织身份认证。原先前端、API、Worker、
+PostgreSQL、Redis、MinIO 分离的付费拓扑保存在 [`render.paid.yaml`](render.paid.yaml)；需要时将其
+内容替换根 `render.yaml` 后再创建付费 Blueprint。
 
 ### 隐私、审计与使用边界
 
@@ -342,7 +360,8 @@ screen.
   Recognition results come only from the target API configured for an evaluation task.
 - Agnes is used only to assign demographic groups to authorized evaluation samples;
   it does not determine an audit outcome.
-- Image objects are stored in MinIO, business records in PostgreSQL, and batch
+- Image objects are stored in S3-compatible storage (local MinIO or managed
+  Supabase Storage), business records in PostgreSQL, and batch
   annotation/evaluation work in Redis + ARq.
 - Provider calls are bounded by timeouts, concurrency limits, retries, and
   per-sample failure isolation. Failed samples can be inspected and retried.
@@ -353,7 +372,7 @@ screen.
 - Pandas and NumPy metric logic remains independent of the provider adapters,
   allowing future standards to be added without coupling to a vendor contract.
 - Report identifiers, report summaries, and generation events are written to the
-  audit trail; PDF archives are stored in MinIO.
+  audit trail; PDF archives are stored in S3-compatible object storage.
 
 ### Agnes and target API integration
 
@@ -393,7 +412,8 @@ callbacks, and JSON/base64-only providers need a dedicated adapter in
   Recharts, i18next, and Axios.
 - **API:** Python 3.12, FastAPI, SQLAlchemy async ORM, Pydantic, and OpenAPI.
 - **Data and jobs:** PostgreSQL 16, Redis 7, ARq, Pandas, and NumPy.
-- **Files and reporting:** MinIO, Jinja2, and WeasyPrint.
+- **Files and reporting:** S3-compatible storage (MinIO / Supabase Storage),
+  Jinja2, and WeasyPrint.
 - **Integrations:** Agnes demographic-annotation adapter and a configurable
   target-recognition API adapter.
 - **Local integration environment:** Docker Compose runs PostgreSQL, Redis,
@@ -422,7 +442,8 @@ when intentionally erasing local PostgreSQL, Redis, and MinIO volumes.
 ### Environment variables
 
 Copy [`.env.example`](.env.example) before configuring a deployment. The key
-groups are database/object storage (`POSTGRES_*`, `DATABASE_URL`, `MINIO_*`),
+groups are database/object storage (`POSTGRES_*`, `DATABASE_URL`, `MINIO_*`,
+`S3_*`),
 queue and ephemeral secrets (`REDIS_URL`, `API_SECRET_TTL_SECONDS`), Agnes
 (`AGNES_*`), local access (`JWT_SECRET`, `LOCAL_SINGLE_USER_MODE`,
 `LOCAL_ADMIN_*`), fixture data (`SEED_DEMO_DATA`), upload controls (`MAX_UPLOAD_*`),
@@ -458,7 +479,9 @@ also add detailed evidence events.
 For an HTTP/queue/report workflow check without an external vendor, use the
 internal Compose-only simulator address
 `http://simulator:8080/v1/face/recognize` with no authentication. It is not a
-public endpoint and must not be presented as one.
+public endpoint and must not be presented as one. The free Render image replaces
+the form default with its same-container `127.0.0.1` simulator; both endpoints
+verify the integration contract only, not real recognition performance.
 
 ### Validate and develop
 
@@ -476,6 +499,35 @@ debugging, create a Python virtual environment, install
 `requirements-dev.txt`, run `uvicorn main:app --reload`, and start
 `arq worker_settings.WorkerSettings` in a second terminal after PostgreSQL,
 Redis, and MinIO are available.
+
+### Free deployment on Render
+
+The root [`render.yaml`](render.yaml) is the default free Blueprint. One Render
+Free Web Service serves the React build and FastAPI API while also running a
+single-concurrency ARq worker and the internal contract-test simulator. A free
+Supabase project supplies PostgreSQL and private S3-compatible Storage; a free
+Upstash database supplies TLS Redis for ARq and expiring target-API secrets.
+
+1. Create a Supabase Free project and a private `fairbench-assets` Storage bucket.
+2. Generate Supabase S3 access keys and retain the complete endpoint ending in
+   `/storage/v1/s3`, region, access key ID, and secret access key.
+3. Copy the Supabase **Session pooler** PostgreSQL connection string from the
+   Connect panel, including its SSL parameter.
+4. Create an Upstash Free Redis database and copy its `rediss://` TLS URL.
+5. In Render choose **New → Blueprint**, connect `rainliu0309/fairbench-ai-app`,
+   and select `main`.
+6. Supply the prompted database, Redis, S3, and Agnes environment variables,
+   then apply the Blueprint.
+7. When the service is Live, verify `/health`, open the site, and sign in with
+   the default administrator session.
+
+Commits pushed to `main` deploy automatically. Free Render services sleep when
+idle, so the first request can have a cold-start delay; active assessment
+polling keeps the service awake while a job is running. Provider free-tier
+quotas and inactivity policies can change and are not a substitute for the
+backups, object retention, monitoring, and identity controls required for an
+official deployment. The separated paid topology is retained in
+[`render.paid.yaml`](render.paid.yaml).
 
 ### Deployment, privacy, and audit boundary
 
