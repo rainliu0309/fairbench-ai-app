@@ -5,9 +5,7 @@
 
 ### 🚀 [Live Demo · 在线体验](https://fairbench-ai-app.onrender.com)
 
-Fair Bench 面向公共人工智能监管机构，提供覆盖测试图集管理、人口属性标注、外部人脸
-识别接口评测、公平性指标分析和审计归档报告生成的一体化监管工作台。平台不训练或提供
-人脸识别模型，仅对接并评测待审算法，以可追溯、可复核的方式支持监管评估。
+Fair Bench 面向公共人工智能监管机构，提供覆盖测试图集管理、人口属性标注、外部人脸识别接口评测、公平性指标分析和审计归档报告生成的一体化监管工作台。平台不训练或提供人脸识别模型，仅对接并评测待审算法，以可追溯、可复核的方式支持监管评估。
 
 Fair Bench is a self-hosted fairness-audit platform for public AI regulators. It
 provides an integrated workflow for test dataset management, demographic
