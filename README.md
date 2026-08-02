@@ -314,9 +314,11 @@ Free，因此不会请求 Render 付费实例。前端与 API 同源，所有服
 Upstash 与 Render 的免费额度和停用政策可能变化，正式处理大规模或受监管数据前应升级并配置备份、
 WORM/对象锁、监控和组织级身份认证。
 
-为了演示便利，免费 Blueprint 默认启用 `LOCAL_SINGLE_USER_MODE=true` 且不自动写入合成数据。
-部署给外部机构或处理真实数据前，应关闭单用户模式并接入组织身份认证；如需更高可用性、独立
-扩缩容和持久化策略，应在 Render 或其他云平台上按同一服务边界拆分部署。
+为了保证线上演示链路完整，免费 Blueprint 默认启用 `LOCAL_SINGLE_USER_MODE=true`，并在首次
+启动时写入受控合成 SVG 图集、系统评测任务以及用于数据看板和审计报告预览的指标数据。系统
+仅在缺少该演示图集时创建它，不会覆盖用户上传的数据。部署给外部机构或处理真实数据前，应将
+`SEED_DEMO_DATA` 设为 `false`、关闭单用户模式并接入组织身份认证；如需更高可用性、独立扩缩容
+和持久化策略，应在 Render 或其他云平台上按同一服务边界拆分部署。
 
 ### 隐私、审计与使用边界
 
@@ -525,6 +527,13 @@ quotas and inactivity policies can change and are not a substitute for the
 backups, object retention, monitoring, and identity controls required for an
 official deployment. Higher-availability deployments can split these service
 boundaries on Render or another cloud provider as operational requirements grow.
+
+For a complete online walkthrough, the free Blueprint enables
+`SEED_DEMO_DATA=true`. On its first startup it loads the controlled synthetic
+SVG dataset, system evaluation tasks, and their dashboard/report-preview
+metrics. It never overwrites user datasets. Before an external or official
+deployment, set `SEED_DEMO_DATA=false`, disable single-user access, and use an
+organization-managed identity provider.
 
 ### Deployment, privacy, and audit boundary
 
