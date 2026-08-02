@@ -3,9 +3,7 @@
 > **A governed, traceable workflow for assessing facial-recognition fairness.**<br>
 > 为公共人工智能算法监管提供可追溯的人脸识别公平性评测工作流。
 
-### 🚀 Live Demo · 在线体验
-
-**[fairbench-ai-app.onrender.com](https://fairbench-ai-app.onrender.com)**
+### 🚀 [Live Demo · 在线体验](https://fairbench-ai-app.onrender.com)
 
 Fair Bench is a self-hosted B2G fairness-audit platform for public AI oversight
 teams. It governs evaluation datasets, requests demographic annotations from
