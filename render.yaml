@@ -31,7 +31,7 @@ services:
       - key: S3_SECRET_KEY
         sync: false
       - key: S3_BUCKET
-        value: fairbench-assets
+        value: fairbench-ai-app
       - key: S3_REGION
         sync: false
       - key: S3_FORCE_PATH_STYLE

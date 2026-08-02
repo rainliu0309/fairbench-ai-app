@@ -297,7 +297,7 @@ Free，因此不会请求 Render 付费实例。前端与 API 同源，所有服
 
 部署前先准备以下三组信息，任何密钥都不要提交到 Git：
 
-1. 在 Supabase 创建 Free 项目；在 Storage 新建私有 bucket `fairbench-assets`；
+1. 在 Supabase 创建 Free 项目；在 Storage 新建私有 bucket `fairbench-ai-app`；
 2. 在 Supabase Storage 的 S3 设置中生成 Access Key，记录 Endpoint、Region、Access Key ID 和
    Secret Access Key。Endpoint 必须是完整的 `https://<project-ref>.storage.supabase.co/storage/v1/s3`；
 3. 在 Supabase 的 **Connect** 面板复制 **Session pooler** PostgreSQL URL，保留 SSL 参数；若密码
@@ -510,7 +510,7 @@ single-concurrency ARq worker and the internal contract-test simulator. A free
 Supabase project supplies PostgreSQL and private S3-compatible Storage; a free
 Upstash database supplies TLS Redis for ARq and expiring target-API secrets.
 
-1. Create a Supabase Free project and a private `fairbench-assets` Storage bucket.
+1. Create a Supabase Free project and a private `fairbench-ai-app` Storage bucket.
 2. Generate Supabase S3 access keys and retain the complete endpoint ending in
    `/storage/v1/s3`, region, access key ID, and secret access key.
 3. Copy the Supabase **Session pooler** PostgreSQL connection string from the
