@@ -320,6 +320,9 @@ WORM/对象锁、监控和组织级身份认证。
 `SEED_DEMO_DATA` 设为 `false`、关闭单用户模式并接入组织身份认证；如需更高可用性、独立扩缩容
 和持久化策略，应在 Render 或其他云平台上按同一服务边界拆分部署。
 
+演示 SVG 同时随部署镜像提供，并在种子对象尚未写入或短暂不可读时作为只读回退源；用户上传的
+图像仍只从私有对象存储读取。
+
 ### 隐私、审计与使用边界
 
 - 仅上传具有合法授权、明确用途和适当数据处理依据的图像；
@@ -534,6 +537,10 @@ SVG dataset, system evaluation tasks, and their dashboard/report-preview
 metrics. It never overwrites user datasets. Before an external or official
 deployment, set `SEED_DEMO_DATA=false`, disable single-user access, and use an
 organization-managed identity provider.
+
+The controlled SVG fixtures are also packaged in the deployment image as a
+read-only fallback while seeded objects are unavailable. User-uploaded images
+continue to be served only from private object storage.
 
 ### Deployment, privacy, and audit boundary
 

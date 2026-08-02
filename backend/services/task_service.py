@@ -22,9 +22,19 @@ from models import (
 )
 from services.agnes_service import agnes_service
 from services.audit_service import append_audit_log
+from services.demo_service import load_bundled_demo_asset
 from services.stats_service import calculate_fairness_metrics
 from services.storage_service import storage_service
 from services.target_api_service import evaluate_sample
+
+
+async def read_sample_bytes(sample: SampleImage) -> bytes:
+    """Load user samples from S3 and controlled demo samples from the image."""
+
+    demo_payload = await load_bundled_demo_asset(sample)
+    if demo_payload is not None:
+        return demo_payload
+    return await storage_service.get_bytes(sample.object_key)
 
 
 async def enqueue_evaluation(task_id: str, failed_only: bool = False) -> None:
@@ -70,7 +80,7 @@ async def annotate_dataset(_ctx: dict[str, Any], dataset_id: str) -> dict[str, A
 
         async def annotate_one(sample: SampleImage) -> tuple[str, dict[str, Any] | None, str | None]:
             try:
-                image_bytes = await storage_service.get_bytes(sample.object_key)
+                image_bytes = await read_sample_bytes(sample)
                 labels = await agnes_service.annotate(
                     image_bytes, sample.content_type, sample.filename
                 )
@@ -192,7 +202,7 @@ async def run_evaluation(
                 session.add(result_row)
 
             try:
-                image_bytes = await storage_service.get_bytes(sample.object_key)
+                image_bytes = await read_sample_bytes(sample)
                 if not sample.effective_labels:
                     labels = await agnes_service.annotate(
                         image_bytes, sample.content_type, sample.filename

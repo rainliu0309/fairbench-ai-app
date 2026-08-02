@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from sqlalchemy import select
@@ -20,16 +21,35 @@ from services.storage_service import storage_service
 from core.config import settings
 
 
+async def load_bundled_demo_asset(sample: SampleImage) -> bytes | None:
+    """Read a controlled SVG fixture packaged in the application image.
+
+    Demo rows are deliberately immutable and always point to a ``demo/`` key.
+    Keeping a read-only image copy in the deployment image lets the public
+    walkthrough remain usable if an older seed run committed metadata before
+    its S3 object archive was available. User-uploaded samples never take this
+    path and continue to be served exclusively from object storage.
+    """
+
+    if not sample.object_key.startswith("demo/"):
+        return None
+
+    root = Path(settings.demo_assets_path).resolve()
+    filename = Path(sample.filename)
+    if filename.name != sample.filename:
+        return None
+    asset = (root / filename).resolve()
+    if root not in asset.parents or not asset.is_file():
+        return None
+    return await asyncio.to_thread(asset.read_bytes)
+
+
 async def _ensure_demo_objects(samples: list[SampleImage]) -> None:
     """Archive controlled synthetic assets in MinIO for actual HTTP evaluation."""
-    root = Path(settings.demo_assets_path)
     for sample in samples:
-        if not sample.object_key.startswith("demo/"):
+        payload = await load_bundled_demo_asset(sample)
+        if payload is None:
             continue
-        asset = root / sample.filename
-        if not asset.is_file():
-            continue
-        payload = asset.read_bytes()
         await storage_service.put_bytes(sample.object_key, payload, sample.content_type)
 
 

@@ -18,6 +18,7 @@ from core.security import clear_task_secret
 from models import Dataset, EvaluationTask, SampleImage, TaskStatus
 from schemas import ApiResponse, DatasetSummary, LabelUpdate, SampleSummary
 from services.audit_service import append_audit_log
+from services.demo_service import load_bundled_demo_asset
 from services.storage_service import storage_service
 from services.task_service import enqueue_dataset_annotation
 
@@ -255,7 +256,11 @@ async def read_sample_content(
     )
     if sample is None:
         raise HTTPException(status_code=404, detail=bilingual("not_found"))
-    payload = await storage_service.get_bytes(sample.object_key)
+    # System-owned demo SVGs have a packaged fallback so an earlier interrupted
+    # seed cannot leave the interactive walkthrough with broken thumbnails.
+    payload = await load_bundled_demo_asset(sample)
+    if payload is None:
+        payload = await storage_service.get_bytes(sample.object_key)
     return Response(
         content=payload,
         media_type=sample.content_type,
