@@ -134,7 +134,6 @@ fairbench-ai-app/
 ├── docker-compose.yml
 ├── Dockerfile.render-free       # Render 免费单服务生产镜像
 ├── render.yaml                  # 默认免费 Blueprint
-├── render.paid.yaml             # 可选的资源分离付费 Blueprint
 ├── .env.example
 ├── LICENSE
 └── README.md
@@ -316,9 +315,8 @@ Upstash 与 Render 的免费额度和停用政策可能变化，正式处理大�
 WORM/对象锁、监控和组织级身份认证。
 
 为了演示便利，免费 Blueprint 默认启用 `LOCAL_SINGLE_USER_MODE=true` 且不自动写入合成数据。
-部署给外部机构或处理真实数据前，应关闭单用户模式并接入组织身份认证。原先前端、API、Worker、
-PostgreSQL、Redis、MinIO 分离的付费拓扑保存在 [`render.paid.yaml`](render.paid.yaml)；需要时将其
-内容替换根 `render.yaml` 后再创建付费 Blueprint。
+部署给外部机构或处理真实数据前，应关闭单用户模式并接入组织身份认证；如需更高可用性、独立
+扩缩容和持久化策略，应在 Render 或其他云平台上按同一服务边界拆分部署。
 
 ### 隐私、审计与使用边界
 
@@ -525,8 +523,8 @@ idle, so the first request can have a cold-start delay; active assessment
 polling keeps the service awake while a job is running. Provider free-tier
 quotas and inactivity policies can change and are not a substitute for the
 backups, object retention, monitoring, and identity controls required for an
-official deployment. The separated paid topology is retained in
-[`render.paid.yaml`](render.paid.yaml).
+official deployment. Higher-availability deployments can split these service
+boundaries on Render or another cloud provider as operational requirements grow.
 
 ### Deployment, privacy, and audit boundary
 
